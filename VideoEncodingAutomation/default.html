@@ -1,0 +1,445 @@
+﻿<!DOCTYPE html>
+
+<html>
+<head>
+	<title>Video Encoding Automation</title>
+	<script type="text/javascript">
+		window.onerror = function (msg, url, line, charIdx)
+		{
+			try
+			{
+				alert("An unexpected error has occurred.\n\n" + msg + "\nURL: " + url + "\nLine: " + line + "\nChar: " + charIdx);
+			}
+			catch (ex)
+			{
+				alert(ex);
+			}
+		};
+	</script>
+	<script src="jquery-3.1.1.min.js" type="text/javascript"></script>
+	<script type="text/javascript">
+		$(window).resize(resized);
+		$(function ()
+		{
+			RefreshStatus();
+			RefreshSlowStatus();
+			StartLogStreaming();
+			resized();
+		});
+		function RefreshStatus()
+		{
+			if (!RefreshAutomatically())
+			{
+				setTimeout(RefreshStatus, 500);
+				return;
+			}
+			GetJSON("status"
+			, function (obj)
+			{
+				$("#statusUpdateFailed").hide();
+				$("#status").html(
+					'<div>HandbrakeAgent Status: ' + (obj.IsAgentActive ? (obj.IsAgentPaused ? 'Paused' : 'Normal') : 'Crashed')
+					+ (obj.IsAgentActive ? '' : ' <input type="button" onclick="restartHandbrakeAgent()" value="Restart" />')
+					+ '</div>'
+					+ '<div>Handbrake Process Running: ' + (obj.IsHandbrakeActive ? 'Yes' : 'No') + '</div>'
+					+ (obj.IsHandbrakeActive ?
+						(
+							'<div>Current Task: ' + obj.currentTask.inputFileRelativePath + '</div>'
+							+ '<div>Progress: ' + obj.percentComplete.toFixed(2) + ' %</div>'
+							+ '<div>FPS: ' + obj.fps.toFixed(2) + '</div>'
+							+ '<div>Average FPS: ' + obj.avgFps.toFixed(2) + '</div>'
+							+ '<div>ETA: ' + obj.ETA + '</div>'
+							+ (obj.comment ? ('<div>' + htmlEncode(obj.comment) + '</div>') : '')
+						) : ''
+					  )
+				);
+				SetVisibility("#btnPause", obj.IsAgentActive && !obj.IsAgentPaused);
+				SetVisibility("#btnResume", obj.IsAgentActive && obj.IsAgentPaused);
+				SetVisibility("#btnAbort", obj.IsAgentActive && obj.IsAgentPaused && obj.IsHandbrakeActive);
+				SetVisibility("#controlsUnavailable", !obj.IsAgentActive);
+				resized();
+				setTimeout(RefreshStatus, 500);
+			}
+			, function (jqxhr, settings, exception)
+			{
+				$("#statusUpdateFailed").show();
+				setTimeout(RefreshStatus, 1000);
+			});
+		}
+		function RefreshSlowStatus()
+		{
+			if (!RefreshAutomatically())
+			{
+				setTimeout(RefreshSlowStatus, 500);
+				return;
+			}
+			GetJSON("slowstatus"
+			, function (obj)
+			{
+				$("#taskListsUpdateFailed").hide();
+				$("#queuedTasks").html(obj.queuedTasks.join("<br/>"));
+				$("#recentlyFinishedTasks").html(obj.recentlyFinishedTasks.join("<br/>"));
+				resized();
+				setTimeout(RefreshSlowStatus, 5000);
+			}
+			, function (jqxhr, settings, exception)
+			{
+				$("#taskListsUpdateFailed").show();
+				setTimeout(RefreshSlowStatus, 5000);
+			});
+		}
+		function SetVisibility(selector, visible)
+		{
+			$(selector).each(function (idx, ele)
+			{
+				var $ele = $(ele);
+				if ($ele.is(":visible"))
+				{
+					if (!visible)
+						$ele.hide();
+				}
+				else
+				{
+					if (visible)
+						$ele.show();
+				}
+			});
+		}
+		function restartHandbrakeAgent()
+		{
+			$.ajax({ url: "restart_handbrake_agent" })
+			.done(function (response)
+			{
+			})
+			.fail(function (jqxhr, settings, exception)
+			{
+				alert("Unable to restart HandBrake agent.");
+			});
+		}
+		function RefreshAutomatically()
+		{
+			return $("#refreshAutomatically").is(":checked");
+		}
+		function AbortHBProc()
+		{
+			ScriptedConfirm("Do you really want to abort the current HandBrake process?", function ()
+			{
+				$.ajax({ url: "abort_handbrake_processing" })
+				.done(function (response)
+				{
+				})
+				.fail(function (jqxhr, settings, exception)
+				{
+					alert("Unable to abort HandBrake processing.");
+				});
+			});
+		}
+		function PauseHBProc()
+		{
+			$.ajax({ url: "pause_handbrake_processing" })
+			.done(function (response)
+			{
+			})
+			.fail(function (jqxhr, settings, exception)
+			{
+				alert("Unable to pause queue processing.");
+			});
+		}
+		function UnpauseHBProc()
+		{
+			$.ajax({ url: "unpause_handbrake_processing" })
+			.done(function (response)
+			{
+			})
+			.fail(function (jqxhr, settings, exception)
+			{
+				alert("Unable to unpause queue processing.");
+			});
+		}
+		function GetJSON(url, done, fail)
+		{
+			$.ajax({ url: url, dataType: "json" }).done(done).fail(fail);
+		}
+		function ScriptedConfirm(question, yesCB, noCB)
+		{
+			var $qbox = $('<div class="dialogBox"><div class="dialogQuestion">'
+				+ question + '</div><div class="dialogButtons"></div></div>');
+			var $btnYes = $('<input type="button" value="Yes" />');
+			var $btnNo = $('<input type="button" value="No" />');
+			$btnYes.click(function ()
+			{
+				$qbox.remove();
+				typeof yesCB == 'function' && yesCB();
+			});
+			$btnNo.click(function ()
+			{
+				$qbox.remove();
+				typeof noCB == 'function' && noCB();
+			});
+			$qbox.children('.dialogButtons').append($btnYes).append($btnNo);
+			$('body').append($qbox);
+			$qbox.css('left', (($(window).width() / 2) - ($qbox.width() / 2)) + 'px');
+			$qbox.css('top', (($(window).height() / 2) - ($qbox.height() / 2)) + 'px');
+		}
+		var logReaderId;
+		var lastLogLineLoaded = -1;
+		var isLogScrolledToBottom = true;
+		function StartLogStreaming()
+		{
+			$.ajax({ url: "logReaderId" })
+			.done(function (response)
+			{
+				$("#logUpdateFailed").hide();
+				logReaderId = response;
+				StreamLogLines();
+			})
+			.fail(function (jqxhr, settings, exception)
+			{
+				$("#logUpdateFailed").show();
+				setTimeout(StartLogStreaming, 1000);
+			});
+		}
+		function StreamLogLines()
+		{
+			GetJSON("log?l=" + lastLogLineLoaded + "&i=" + logReaderId
+			, function (obj)
+			{
+				$("#logUpdateFailed").hide();
+				if (obj.logUpdate == "refresh")
+				{
+					$("#log").empty();
+					StartLogStreaming();
+					lastLogLineLoaded = -1;
+				}
+				else
+				{
+					SaveLogScroll();
+					$("#log").append('<div>' + obj.logUpdate.join('</div><div>') + '</div>');
+					lastLogLineLoaded = obj.lastLineLoaded;
+					LoadLogScroll();
+					setTimeout(StreamLogLines, 0);
+				}
+			},
+			function (jqxhr, settings, exception)
+			{
+				$("#logUpdateFailed").show();
+				setTimeout(StreamLogLines, 1000);
+			});
+		}
+		function SaveLogScroll()
+		{
+			isLogScrolledToBottom = ($('#logWrapper').scrollTop() + $('#logWrapper').height() + 200 >= $('#log').height());
+		}
+		function LoadLogScroll()
+		{
+			if (isLogScrolledToBottom)
+				$('#logWrapper').scrollTop($('#log').height());
+		}
+		function resized()
+		{
+			var wndH = $(window).height();
+			var rootH = $("#root").height();
+			var logH = $('#logWrapper').height();
+			var maxLogH = (wndH - (rootH - logH)) - 20;
+			if (logH != maxLogH)
+			{
+				SaveLogScroll();
+				$('#logWrapper').css("height", maxLogH);
+				LoadLogScroll();
+			}
+		}
+		function htmlEncode(value)
+		{
+			return $('<div/>').text(value).html();
+		}
+		function htmlDecode(value)
+		{
+			return $('<div/>').html(value).text();
+		}
+		String.prototype.padLeft = function (len, c)
+		{
+			var str = this;
+			while (str.length < len)
+				str = (c || "&nbsp;") + str;
+			return str;
+		};
+	</script>
+	<style type="text/css">
+		body
+		{
+			font-family: Consolas, monospace;
+			font-size: 10pt;
+			background-color: #000000;
+			color: #009900;
+		}
+
+		.boxLabel
+		{
+		}
+
+		.greenbox
+		{
+			border: 1px solid #007700;
+			padding: 2px;
+			margin: 2px 0px 10px 0px;
+			min-height: 15px;
+			overflow-x: auto;
+			overflow-y: auto;
+			overflow-wrap: break-word;
+		}
+
+		.taskList
+		{
+			max-height: 100px;
+		}
+
+		#logWrapper
+		{
+			min-height: 100px;
+		}
+
+		input[type="checkbox"]
+		{
+			vertical-align: middle;
+		}
+
+		input[type="button"]
+		{
+			border: 1px solid #007700;
+			background-color: #222222;
+			color: #00AA00;
+		}
+
+			input[type="button"]:hover
+			{
+				border: 1px solid #00AA00;
+				background-color: #444444;
+				color: #00CC00;
+			}
+
+			input[type="button"]:active
+			{
+				border: 1px solid #00FF00;
+				background-color: #666666;
+				color: #00FF00;
+			}
+
+		#refreshAutomaticallyContainer
+		{
+			margin-bottom: 10px;
+		}
+
+		.dialogBox
+		{
+			background-color: #101010;
+			padding: 2px 5px;
+			border: 1px solid #007700;
+			position: absolute;
+			max-width: 256px;
+			box-shadow: 0px 0px 0px 2000px rgba(0,0,0,0.5);
+		}
+
+		.dialogQuestion
+		{
+			color: #00AA00;
+			margin-bottom: 10px;
+		}
+
+		.dialogButtons
+		{
+			padding: 2px 2px 2px 2px;
+			text-align: center;
+		}
+
+			.dialogButtons input[type="button"]
+			{
+				margin: 0px 10px;
+			}
+
+		#btnPause, #btnResume, #btnAbort
+		{
+			display: none;
+		}
+
+		.updateFailedMsg
+		{
+			color: #DD0000;
+			display: none;
+		}
+		/* Custom scrollbar for Chrome*/
+		::-webkit-scrollbar
+		{
+			width: 16px;
+			height: 16px;
+		}
+
+		::-webkit-scrollbar-thumb:vertical
+		{
+			background: #132513;
+			border: 1px solid #007700;
+			border-right: none;
+		}
+		::-webkit-scrollbar-thumb:horizontal
+		{
+			background: #132513;
+			border: 1px solid #007700;
+			border-bottom: none;
+		}
+
+		::-webkit-scrollbar-thumb:hover
+		{
+			background: #183018;
+		}
+
+		::-webkit-scrollbar-thumb:active
+		{
+			background: #224422;
+		}
+
+		::-webkit-scrollbar-track:vertical
+		{
+			border-left: 1px dotted #003900;
+		}
+
+		::-webkit-scrollbar-track:horizontal
+		{
+			border-top: 1px dotted #003900;
+		}
+
+		::-webkit-scrollbar-corner
+		{
+			border-left: 1px dotted #003900;
+			border-top: 1px dotted #003900;
+		}
+	</style>
+</head>
+<body>
+	<div id="root">
+		<div id="refreshAutomaticallyContainer"><label><input id="refreshAutomatically" type="checkbox" checked="checked" />Refresh Automatically</label></div>
+		<div id="statusUpdateFailed" class="updateFailedMsg">Unable to update server status. Did the server go offline?</div>
+		<div id="taskListsUpdateFailed" class="updateFailedMsg">Unable to update task lists. Did the server go offline?</div>
+		<div id="logUpdateFailed" class="updateFailedMsg">Unable to update log. Did the server go offline?</div>
+		<div class="boxLabel">Status:</div>
+		<div id="status" class="greenbox">
+		</div>
+		<div class="boxLabel">HandbrakeAgent Controls:</div>
+		<div id="agentcontrols" class="greenbox">
+			<input id="btnPause" type="button" onclick="PauseHBProc()" value="Pause Queue" title="When paused, HandbrakeAgent will not process the queue.  While paused, you may abort the current HandBrake process." />
+			<input id="btnResume" type="button" onclick="UnpauseHBProc()" value="Resume Queue" title="When paused, HandbrakeAgent will not process the queue.  While paused, you may abort the current HandBrake process." />
+			<input id="btnAbort" type="button" onclick="AbortHBProc()" value="Abort Current HandBrake Process" />
+			<div id="controlsUnavailable">HandbrakeAgent is currently in a crashed state. You may restart it above.</div>
+		</div>
+		<div class="boxLabel">Queued Tasks:</div>
+		<div id="queuedTasks" class="greenbox taskList">
+		</div>
+		<div class="boxLabel">Recently Finished Tasks:</div>
+		<div id="recentlyFinishedTasks" class="greenbox taskList">
+		</div>
+		<div class="boxLabel">Log:</div>
+		<div id="logWrapper" class="greenbox">
+			<div id="log">
+			</div>
+		</div>
+	</div>
+</body>
+</html>
