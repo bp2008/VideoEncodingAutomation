@@ -1,2 +1,2 @@
 # VideoEncodingAutomation
-Automates video encoding using Handbrake
+Automates video encoding using HandbrakeCLI.
