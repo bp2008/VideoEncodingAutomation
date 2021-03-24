@@ -57,7 +57,7 @@ As an example, here is the `encoder.txt` from `q23-SmartCrop`.
 </Settings>
 ```
 
-9. Run `VideoEncodingAutomation.exe` again.  You can view the web interface via `http://localhost:14580/`
+8. Run `VideoEncodingAutomation.exe` again.  You can view the web interface via `http://localhost:14580/`
 
 ## Notes
 
