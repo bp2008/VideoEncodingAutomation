@@ -46,7 +46,7 @@ As an example, here is the `encoder.txt` from `q23-SmartCrop`.
 
 6. Run `VideoEncodingAutomation.exe` once, and then close it.  `Settings.cfg` will be created.
 7. Open `Settings.cfg` and configure as needed.
-8. 
+
 ```xml
 <?xml version="1.0"?>
 <Settings xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
