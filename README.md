@@ -19,7 +19,7 @@ C:\
         -> q26
 ```
 
-The way this works is you drop video files into any of these input folders (`q18`, `q20`, etc) and the **VideoEncodingAutomation** process will automatically transcode the video according to the settings defined in `encoder.txt` within the folder.
+The way this works is you drop video files into any of these input folders (`q18`, `q20`, etc) and the **VideoEncodingAutomation** process will automatically transcode the video according to the settings defined in `encoder.txt` within the folder.  Output goes in an `out` folder next to the `in` folder.
 
 As an example, here is the `encoder.txt` from `q23-SmartCrop`.
 
