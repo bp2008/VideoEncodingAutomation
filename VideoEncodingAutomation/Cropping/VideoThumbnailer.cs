@@ -104,7 +104,7 @@ namespace VideoEncodingAutomation.Cropping
 				// Generate thumbnails
 
 				// This method opens ffmpeg once for each thumbnail and is faster with very large files compared to converting with a slow frame rate.
-				string outputVideoCodec = losslessThumbnails ? " -c:v png" : " -c:v jpg";
+				string outputVideoCodec = losslessThumbnails ? " -c:v png" : " -c:v mjpeg";
 
 				if (sourceVideoDurationSeconds / captureInterval < minimumCaptures + 1)
 					captureInterval = (int)Math.Floor(sourceVideoDurationSeconds / (minimumCaptures + 1));
