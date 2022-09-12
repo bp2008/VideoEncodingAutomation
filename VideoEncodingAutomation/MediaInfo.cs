@@ -30,6 +30,11 @@ namespace VideoEncodingAutomation
 
 		[JsonIgnore]
 		public string json;
+		/// <summary>
+		/// Json string after reprocessing by subtitle language detector. Only set if debugger is attached.
+		/// </summary>
+		[JsonIgnore]
+		public string reprocessedJson;
 
 		public static MediaInfo Load(string mediaInfoCLIPath, string FilePath)
 		{
@@ -39,6 +44,11 @@ namespace VideoEncodingAutomation
 				if (!string.IsNullOrWhiteSpace(std))
 				{
 					MediaInfoWrapper miw = JsonConvert.DeserializeObject<MediaInfoWrapper>(std, new TrackConverter());
+					if (miw.media.Text.Length > 0 && miw.media.Text.All(tt => tt.Language != "en"))
+					{
+						AutodetectSubtitleLanguages(FilePath, miw.media);
+						miw.media.reprocessedJson = JsonConvert.SerializeObject(miw.media, Formatting.Indented);
+					}
 					miw.media.json = JValue.Parse(std).ToString(Formatting.Indented);
 					return miw.media;
 				}
@@ -51,6 +61,45 @@ namespace VideoEncodingAutomation
 			if (string.IsNullOrWhiteSpace(mediaInfoCLIPath))
 				return false;
 			return File.Exists(mediaInfoCLIPath);
+		}
+
+		private static void AutodetectSubtitleLanguages(string filePath, MediaInfo media)
+		{
+			// Build list of track numbers
+			List<int> trackNumbers = new List<int>();
+			foreach (TextTrack tt in media.Text)
+			{
+				if (!"PGS".Equals(tt.Format, StringComparison.OrdinalIgnoreCase) // "PGS" subs are bitmap format, so we can't detect language
+					&& int.TryParse(tt.typeorder, out int trackNumber))
+				{
+					trackNumbers.Add(trackNumber);
+				}
+			}
+
+			// Extract subtitle tracks
+			Dictionary<int, string> subs = SubtitleLanguageDetector.GetSubtitleFiles(filePath, trackNumbers.ToArray());
+
+			// Detect languages
+			Dictionary<int, string> languages = new Dictionary<int, string>();
+			foreach (KeyValuePair<int, string> s in subs)
+			{
+				if (!string.IsNullOrWhiteSpace(s.Value))
+				{
+					string lang = SubtitleLanguageDetector.DetectLanguage(s.Value);
+					if (lang != null)
+						languages[s.Key] = lang;
+				}
+			}
+
+			// Assign language codes to TextTracks.
+			foreach (TextTrack tt in media.Text)
+			{
+				if (int.TryParse(tt.typeorder, out int trackNumber))
+				{
+					if (languages.TryGetValue(trackNumber, out string lang))
+						tt.Language = lang;
+				}
+			}
 		}
 	}
 	internal class MediaInfoWrapper

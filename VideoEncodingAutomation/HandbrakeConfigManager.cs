@@ -159,19 +159,30 @@ namespace VideoEncodingAutomation
 				}
 				// SUBTITLES
 				TextTrack[] engSubs = mediaInfo.Text.Where(t => "en".Equals(t.Language, StringComparison.OrdinalIgnoreCase)).ToArray();
-				TextTrack forced = engSubs.FirstOrDefault(t => IsYes(t.Forced));
-				TextTrack defaultSub = engSubs.FirstOrDefault(t => IsYes(t.Default));
-				// If there is no default subtitle track, we'll make the default be the first forced subs track.
-				// (forced subs are those normally shown even when captions are not enabled)
-				if (defaultSub == null)
+				if (engSubs.Length == 0 && mediaInfo.Text.Length > 0)
 				{
-					for (int i = 0; i < engSubs.Length; i++)
+					if (mediaInfo.Text.All(tt => string.IsNullOrWhiteSpace(tt.Language)) // All text tracks are missing language data.
+						|| mediaInfo.Text.Any(tt => "PGS".Equals(tt.Format, StringComparison.OrdinalIgnoreCase))) // At least one text track is PGS format (bitmap subtitles).
 					{
-						if (IsYes(engSubs[i].Forced))
+						subtitleArgs = "--all-subtitles";
+					}
+				}
+				else
+				{
+					TextTrack forced = engSubs.FirstOrDefault(t => IsYes(t.Forced));
+					TextTrack defaultSub = engSubs.FirstOrDefault(t => IsYes(t.Default));
+					// If there is no default subtitle track, we'll make the default be the first forced subs track.
+					// (forced subs are those normally shown even when captions are not enabled)
+					if (defaultSub == null)
+					{
+						for (int i = 0; i < engSubs.Length; i++)
 						{
-							subtitleArgs = "-s " + string.Join(",", engSubs.Select(t => t.GetOrderArgument()))
-										+ " --subtitle-default=" + (i + 1);
-							break;
+							if (IsYes(engSubs[i].Forced))
+							{
+								subtitleArgs = "-s " + string.Join(",", engSubs.Select(t => t.GetOrderArgument()))
+											+ " --subtitle-default=" + (i + 1);
+								break;
+							}
 						}
 					}
 				}

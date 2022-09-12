@@ -36,8 +36,12 @@
   </PropertyGroup>
   <PropertyGroup />
   <ItemGroup>
-    <Reference Include="Newtonsoft.Json, Version=12.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
-      <HintPath>..\packages\Newtonsoft.Json.12.0.3\lib\net45\Newtonsoft.Json.dll</HintPath>
+    <Reference Include="netstandard, Version=2.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51" />
+    <Reference Include="Newtonsoft.Json, Version=13.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
+      <HintPath>..\packages\Newtonsoft.Json.13.0.1\lib\net45\Newtonsoft.Json.dll</HintPath>
+    </Reference>
+    <Reference Include="NTextCat">
+      <HintPath>NTextCat\NTextCat.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
@@ -61,6 +65,7 @@
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Settings.cs" />
+    <Compile Include="SubtitleLanguageDetector.cs" />
     <Compile Include="Util.cs" />
     <Compile Include="WebServer.cs" />
   </ItemGroup>
@@ -74,6 +79,11 @@
     <Content Include="lib\NewtonsoftJson\Newtonsoft.Json.dll" />
     <Content Include="lib\NewtonsoftJson\Newtonsoft.Json.pdb" />
     <Content Include="lib\NewtonsoftJson\Newtonsoft.Json.xml" />
+    <Content Include="NTextCat\Core14.profile.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="NTextCat\NTextCat.dll" />
+    <Content Include="NTextCat\NTextCat.xml" />
   </ItemGroup>
   <ItemGroup>
     <None Include="app.config" />
