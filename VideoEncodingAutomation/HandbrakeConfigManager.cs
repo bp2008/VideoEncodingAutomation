@@ -20,6 +20,7 @@ namespace VideoEncodingAutomation
 		public readonly string videoArgs;
 		public readonly string audioArgs;
 		public readonly string subtitleArgs;
+		public readonly string dubArgs;
 		public readonly string rangeArgs;
 
 		private static Regex rxReadCrop = new Regex("^(\\d+):(\\d+):(\\d+):(\\d+)$", RegexOptions.Compiled);
@@ -41,13 +42,14 @@ namespace VideoEncodingAutomation
 			string videoEncoder = encoderConfig.VideoEncoder;
 
 			bool reencodeAudio = true;
+			bool hasEngAudio = false;
 			int audioKbps = 360;
 			string chooseAudioTrack = null;
 
 			subtitleArgs = "--subtitle-lang-list eng"
 				+ " --all-subtitles"
-				+ " --native-language eng"
-				+ " --native-dub";
+				+ " --native-language eng";
+			dubArgs = " --native-dub";
 
 			if (encoderConfig.LimitedRange)
 			{
@@ -84,6 +86,7 @@ namespace VideoEncodingAutomation
 							 && (a.Title == null || !a.Title.Contains("comment"))
 							 && a.Channels > 0)
 					.ToArray();
+				hasEngAudio = engAudio.Length > 0;
 
 				AudioTrack withMostChannels = engAudio.OrderByDescending(a => a.Channels).FirstOrDefault();
 
@@ -144,6 +147,8 @@ namespace VideoEncodingAutomation
 					//  If no mixdown specified, we get Stereo @ 128 Kbps as above.
 
 					AudioTrack first = engAudio.FirstOrDefault();
+					if (first == null && mediaInfo.Audio.Length == 1)
+						first = mediaInfo.Audio.First();
 					chooseAudioTrack = first?.GetOrderArgument();
 					int channels = first == null ? 7 : first.Channels;
 					if (channels >= 7)
@@ -165,6 +170,7 @@ namespace VideoEncodingAutomation
 						|| mediaInfo.Text.Any(tt => "PGS".Equals(tt.Format, StringComparison.OrdinalIgnoreCase))) // At least one text track is PGS format (bitmap subtitles).
 					{
 						subtitleArgs = "--all-subtitles";
+						dubArgs = "";
 					}
 				}
 				else
@@ -181,6 +187,7 @@ namespace VideoEncodingAutomation
 							{
 								subtitleArgs = "-s " + string.Join(",", engSubs.Select(t => t.GetOrderArgument()))
 											+ " --subtitle-default=" + (i + 1);
+								dubArgs = "";
 								break;
 							}
 						}
@@ -189,25 +196,35 @@ namespace VideoEncodingAutomation
 			}
 			if (chooseAudioTrack != null)
 			{
-				audioArgs = "-a " + chooseAudioTrack;
+				audioArgs = "--audio " + chooseAudioTrack;
 				if (!reencodeAudio)
 				{
-					// reencodeAudio can only be false if chooseAudioTrack is not null
-					audioArgs += " -E copy";
+					audioArgs += " --aencoder copy";
 				}
 			}
-			else
+			else if (hasEngAudio)
 			{
 				// We didn't choose a specific track.
 				audioArgs = "--audio-lang-list eng,und"
 				   + " --first-audio";
 			}
+			else
+			{
+				// There's no english.  Just copy the first audio stream.
+				audioArgs = "--first-audio";
+				// Experimentation shows that "--native-dub" will prevent foreign audio from being included.
+				dubArgs = "";
+			}
 			if (reencodeAudio)
 			{
-				audioArgs += " -E ca_aac"
+				audioArgs += " --aencoder ca_aac"
 						+ " --mixdown 5_2_lfe"
 						+ " --ab " + audioKbps;
 				//+ " --audio-fallback av_aac"
+			}
+			else
+			{
+				audioArgs += " --aencoder copy";
 			}
 
 			string cropArg = "";
@@ -261,6 +278,7 @@ namespace VideoEncodingAutomation
 				+ " " + videoArgs
 				+ " " + audioArgs
 				+ " " + subtitleArgs
+				+ dubArgs
 				+ (outputFilePath.EndsWith(".mp4", StringComparison.OrdinalIgnoreCase) ? " -O" : "")
 				+ (!string.IsNullOrWhiteSpace(rangeArgs) ? " " + rangeArgs : "");
 		}
