@@ -41,7 +41,7 @@ As an example, here is the `encoder.txt` from `q23-SmartCrop`.
 * "VideoEncoder" can be "x265" or "x264"
 * "VideoEncoderPreset" can be any of the encoder presets; you should be familiar with these already if you're setting up this app.
 * "Quality" is the constant rate factor number where 0 is lossless and 51 is terrible.  18-23 is a commonly used range.
-* "HandbrakeCrop" defines a value for HandbrakeCLI's `--crop` argument.  It could be `"0:0:0:0"` to do no cropping, `""` to let handbrake crop automatically, or `"SmartCrop"` to use my own custom cropping calculations which are especially conservative (high priority on preserving all image data, even at the cost of some black rows remaining).
+* "HandbrakeCrop" defines a value for HandbrakeCLI's `--crop` argument.  It could be `"0:0:0:0"` to do no cropping, `""` to let handbrake crop automatically, or `"Smart"` to use my own custom cropping calculations which are especially conservative (high priority on preserving all image data, even at the cost of some black rows remaining).
 * `"KeepInputForDebuggingAfterward"` is for debugging purposes.  If it is false, the input videos are DELETED after transcoding has completed.  Set `LimitedRange` to true in order to use the `"StartTimeSeconds"` and `"DurationSeconds"` arguments.
 
 6. Run `VideoEncodingAutomation.exe` once, and then close it.  `Settings.cfg` will be created.
