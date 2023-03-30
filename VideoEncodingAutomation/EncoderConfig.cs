@@ -13,7 +13,7 @@ namespace VideoEncodingAutomation
 		/// </summary>
 		public string Encoder = "handbrake";
 		/// <summary>
-		/// "x264", "x265".
+		/// "x264", "x265", "av1".
 		/// Higher bit-depth versions ["x264_10bit", "x265_10bit", "x265_12bit"] are handled automatically if MediaInfo CLI is configured.
 		/// </summary>
 		public string VideoEncoder = "x265";
@@ -29,6 +29,14 @@ namespace VideoEncodingAutomation
 		/// Crop argument used for Handbrake: Picture cropping in pixels. &lt;top:bottom:left:right&gt;. If "Smart", then a preprocess is used to compute the best crop size at the cost of slightly extended processing time. Handbrake has autocropping capability but it isn't used here because it crops a bit too aggressively.
 		/// </summary>
 		public string HandbrakeCrop = "0:0:0:0";
+		/// <summary>
+		/// If true, all audio tracks are captured. If false, an algorithm tries to find the best English language track. Regardless, an algorithm decides whether or not to recompress.
+		/// </summary>
+		public bool AllAudioTracks = false;
+		/// <summary>
+		/// If true, all text tracks are captured. If false, only English tracks are captured.
+		/// </summary>
+		public bool AllTextTracks = false;
 
 		public bool LimitedRange = false;
 		public int StartTimeSeconds = 0;
@@ -71,8 +79,16 @@ namespace VideoEncodingAutomation
 						return "Unsupported Quality (range must be [0-51])";
 					return null;
 				}
+				else if (VideoEncoder == "av1")
+				{
+					if (!int.TryParse(VideoEncoderPreset, out int preset) || preset < 1 || preset > 13)
+						return "Unsupported VideoEncoderPreset. Accepted AV1 presets are integers from 1 to 13.";
+					if (Quality < 0 || Quality > 63)
+						return "Unsupported Quality (range must be [0-63])";
+					return null;
+				}
 				else
-					return "VideoEncoder must be x265 or x264";
+					return "VideoEncoder must be x265 or x264 or av1";
 			}
 			else
 				return "Encoder must be handbrake";

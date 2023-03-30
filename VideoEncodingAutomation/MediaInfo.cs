@@ -31,7 +31,7 @@ namespace VideoEncodingAutomation
 		[JsonIgnore]
 		public string json;
 		/// <summary>
-		/// Json string after reprocessing by subtitle language detector. Only set if debugger is attached.
+		/// Json string after reprocessing by subtitle language detector.
 		/// </summary>
 		[JsonIgnore]
 		public string reprocessedJson;
@@ -352,25 +352,11 @@ namespace VideoEncodingAutomation
 		/// </summary>
 		public string Forced;
 		public object extra;
-		public string GetOrderArgument()
-		{
-			return HandbrakeStreamNumber.ToString();
-			//if (!string.IsNullOrWhiteSpace(typeorder))
-			//	return typeorder;
-			//if (!string.IsNullOrWhiteSpace(StreamOrder))
-			//	return StreamOrder;
-			//throw new Exception("No typeorder or StreamOrder field value in this AudioTrack");
-		}
 	}
 	public class TextTrack : Track
 	{
 		[JsonProperty("@typeorder")]
 		public string typeorder;
-		/// <summary>
-		/// MediaInfo's order numbers do not always map to what HandBrake expects.
-		/// So [HandbrakeStreamNumber] is a field I created to assign the correct stream number as understood by Handbrake.
-		/// </summary>
-		public int HandbrakeStreamNumber;
 		public string ID;
 		public string UniqueID;
 		public string Format;
@@ -394,11 +380,6 @@ namespace VideoEncodingAutomation
 		/// "Yes" / "No"
 		/// </summary>
 		public string Forced;
-		public string GetOrderArgument()
-		{
-			return HandbrakeStreamNumber.ToString();
-			//return typeorder;
-		}
 	}
 	public class MenuTrack : Track
 	{

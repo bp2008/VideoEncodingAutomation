@@ -20,7 +20,6 @@ namespace VideoEncodingAutomation
 		public readonly string videoArgs;
 		public readonly string audioArgs;
 		public readonly string subtitleArgs;
-		public readonly string dubArgs;
 		public readonly string rangeArgs;
 
 		private static Regex rxReadCrop = new Regex("^(\\d+):(\\d+):(\\d+):(\\d+)$", RegexOptions.Compiled);
@@ -40,16 +39,8 @@ namespace VideoEncodingAutomation
 			// Set defaults
 
 			string videoEncoder = encoderConfig.VideoEncoder;
-
-			bool reencodeAudio = true;
-			bool hasEngAudio = false;
-			int audioKbps = 360;
-			string chooseAudioTrack = null;
-
-			subtitleArgs = "--subtitle-lang-list eng"
-				+ " --all-subtitles"
-				+ " --native-language eng";
-			dubArgs = " --native-dub";
+			if (videoEncoder == "av1")
+				videoEncoder = "svt_av1";
 
 			if (encoderConfig.LimitedRange)
 			{
@@ -66,7 +57,7 @@ namespace VideoEncodingAutomation
 				{
 					if (video.BitDepth == 10)
 					{
-						if (videoEncoder == "x265" || videoEncoder == "x264")
+						if (videoEncoder == "x265" || videoEncoder == "x264" || videoEncoder == "svt_av1")
 							videoEncoder += "_10bit";
 					}
 					else if (video.BitDepth == 12)
@@ -75,156 +66,170 @@ namespace VideoEncodingAutomation
 							videoEncoder += "_12bit";
 						else if (videoEncoder == "x264")
 							videoEncoder += "_10bit";
+						else if (videoEncoder == "svt_av1")
+							videoEncoder += "_10bit";
 					}
 				}
 
 				// AUDIO
-				// Require English, no creator commentary.
-				// Prefer AAC or AC3, whichever has most channels. If equal, choose AAC.
-				AudioTrack[] engAudio = mediaInfo.Audio
-					.Where(a => "en".Equals(a.Language, StringComparison.OrdinalIgnoreCase)
-							 && (a.Title == null || !a.Title.Contains("comment"))
+				if (encoderConfig.AllAudioTracks)
+				{
+					audioArgs = GetAudioArgs(mediaInfo.Audio);
+				}
+				else
+				{
+					// Require English, no creator commentary.
+					// Prefer Opus, AAC or AC3, whichever has most channels. If equal, choose Opus.
+
+					bool reencodeAudio = true;
+					int audioKbps = 360;
+
+					AudioTrack[] engAudio = mediaInfo.Audio
+					.Where(a => "en".IEquals(a.Language)
+							 && (a.Title == null || !a.Title.IContains("comment"))
 							 && a.Channels > 0)
 					.ToArray();
-				hasEngAudio = engAudio.Length > 0;
 
-				AudioTrack withMostChannels = engAudio.OrderByDescending(a => a.Channels).FirstOrDefault();
+					AudioTrack engWithMostChannels = engAudio.OrderByDescending(a => a.Channels).FirstOrDefault();
 
-				AudioTrack aac = engAudio
-				   .Where(a => "AAC".Equals(a.Format, StringComparison.OrdinalIgnoreCase)
-							|| "AAC LC".Equals(a.Format, StringComparison.OrdinalIgnoreCase)
-							|| "A_AAC-2".Equals(a.Format, StringComparison.OrdinalIgnoreCase))
-				   .OrderByDescending(a => a.Channels)
-				   .FirstOrDefault();
-				AudioTrack ac3 = engAudio
-					.Where(a => "AC-3".Equals(a.Format, StringComparison.OrdinalIgnoreCase)
-							 || "E-AC-3".Equals(a.Format, StringComparison.OrdinalIgnoreCase))
-					.OrderByDescending(a => a.Channels)
-					.FirstOrDefault();
-				AudioTrack best = null;
-				if (aac != null && ac3 != null)
-				{
-					best = ac3.Channels > aac.Channels ? ac3 : aac;
-				}
-				else if (aac != null)
-				{
-					best = aac;
-				}
-				else if (ac3 != null)
-				{
-					best = ac3;
-				}
-				if (best != null && best.Channels <= 5 && withMostChannels.Channels > best.Channels)
-					best = null; // Invalidate "best" track if it is less than 5.1 surround and there is a different track with more audio channels.
-				if (best != null)
-				{
-					reencodeAudio = false;
-					chooseAudioTrack = best.GetOrderArgument();
-				}
-				else
-				{
-					// Handbrake defaults, 7.1 source:                    Output Channels   Subjective notes
-					//
-					//	AAC 7.1 (5_2_lfe):    bitrate 255 or less         7                 sounds bad. 0-255 yields same as default.
-					//                                                                      256-319 sounds middle. 
-					//                                                                      320-383 sounds good. 
-					//                                                                      384-400+ is bigger, not better.
-					//                                                                      This mixdown is apparently not supported for AAC, based on 
-					//                                                                      Handbrake source code, so it is probably falling back to a  
-					//                                                                      lower mixdown.
-					//
-					//  AAC 7point1:          ^^                          7                 same as above. No change to audio stream.
-					//
-					//  AAC 6point1:          ^^                          7                 same as above. No change to audio stream.
-					//
-					//  AAC 5point1:                                      6                 sounds bad (unknown bitrate). (limited testing)
-					//                                                                      240-250 sounds good. 
-					//                                                                      256-300 is bigger, not better. 
-					//                                                                      320 is bigger, not better.
-					//
-					//	AAC Stereo:           bitrate 128                 2                 sounds fine. 80 sounds a bit worse. 120 is about the same.
-					//
-					//  If no mixdown specified, we get Stereo @ 128 Kbps as above.
-
-					AudioTrack first = engAudio.FirstOrDefault();
-					if (first == null && mediaInfo.Audio.Length == 1)
-						first = mediaInfo.Audio.First();
-					chooseAudioTrack = first?.GetOrderArgument();
-					int channels = first == null ? 7 : first.Channels;
-					if (channels >= 7)
-						audioKbps = 360; // A range of 320-383 was tested to produce the same output at 7ch.
-					else if (channels == 6)
-						audioKbps = 250; // This was tested to sound fine.
-					else if (channels == 5)
-						audioKbps = 224; // Wild guess
-					else if (channels == 4)
-						audioKbps = 192; // Wild guess
-					else
-						audioKbps = 128;
-				}
-				// SUBTITLES
-				TextTrack[] engSubs = mediaInfo.Text.Where(t => "en".Equals(t.Language, StringComparison.OrdinalIgnoreCase)).ToArray();
-				if (engSubs.Length == 0 && mediaInfo.Text.Length > 0)
-				{
-					if (mediaInfo.Text.All(tt => string.IsNullOrWhiteSpace(tt.Language)) // All text tracks are missing language data.
-						|| mediaInfo.Text.Any(tt => "PGS".Equals(tt.Format, StringComparison.OrdinalIgnoreCase))) // At least one text track is PGS format (bitmap subtitles).
+					AudioTrack[] engEligibleForBest = engAudio
+						.Where(a => a.Format != null)
+						.Where(a => int.TryParse(a.BitRate, out int bitRate) && bitRate <= 420000)
+						.ToArray();
+					AudioTrack opus = engEligibleForBest
+					   .Where(a => a.Format.IContains("opus"))
+					   .OrderByDescending(a => a.Channels)
+					   .FirstOrDefault();
+					AudioTrack aac = engEligibleForBest
+					   .Where(a => a.Format.IEquals("AAC")
+								|| a.Format.IEquals("AAC LC")
+								|| a.Format.IEquals("A_AAC-2"))
+					   .OrderByDescending(a => a.Channels)
+					   .FirstOrDefault();
+					AudioTrack ac3 = engEligibleForBest
+						.Where(a => a.Format.IEquals("AC-3")
+								 || a.Format.IEquals("E-AC-3"))
+						.OrderByDescending(a => a.Channels)
+						.FirstOrDefault();
+					AudioTrack best = opus;
+					if (best == null || (aac != null && best.Channels < aac.Channels))
+						best = aac;
+					if (best == null || (ac3 != null && best.Channels < ac3.Channels))
+						best = ac3;
+					if (best != null && best.Channels <= 5 && engWithMostChannels.Channels > best.Channels)
+						best = null; // Invalidate "best" track if it is less than 5.1 surround and there is a different track with more audio channels.
+					if (best != null)
 					{
-						subtitleArgs = "--all-subtitles";
-						dubArgs = "";
+						reencodeAudio = false;
+						audioArgs = "--audio " + best.HandbrakeStreamNumber;
+						audioArgs += " --aencoder copy";
+					}
+					else
+					{
+						// Handbrake defaults, 7.1 source:                    Output Channels   Subjective notes
+						//
+						//	AAC 7.1 (5_2_lfe):    bitrate 255 or less         7                 sounds bad. 0-255 yields same as default.
+						//                                                                      256-319 sounds middle. 
+						//                                                                      320-383 sounds good. 
+						//                                                                      384-400+ is bigger, not better.
+						//                                                                      This mixdown is apparently not supported for AAC, based on 
+						//                                                                      Handbrake source code, so it is probably falling back to a  
+						//                                                                      lower mixdown.
+						//
+						//  AAC 7point1:          ^^                          7                 same as above. No change to audio stream.
+						//
+						//  AAC 6point1:          ^^                          7                 same as above. No change to audio stream.
+						//
+						//  AAC 5point1:                                      6                 sounds bad (unknown bitrate). (limited testing)
+						//                                                                      240-250 sounds good. 
+						//                                                                      256-300 is bigger, not better. 
+						//                                                                      320 is bigger, not better.
+						//
+						//	AAC Stereo:           bitrate 128                 2                 sounds fine. 80 sounds a bit worse. 120 is about the same.
+						//
+						//  If no mixdown specified, we get Stereo @ 128 Kbps as above.
+
+						if (engAudio.Length > 0)
+							audioArgs = GetAudioArgs(engAudio); // Could not choose best. Use all English tracks.
+						else if (mediaInfo.Audio.Length > 0)
+							audioArgs = GetAudioArgs(mediaInfo.Audio); // Use all tracks.
+						else
+							audioArgs = "--audio none";
+
+						// The following logic was removed March 2023 but kept in comments because it contains some test results in comments.
+						//AudioTrack first = engAudio.FirstOrDefault();
+						//if (first == null && mediaInfo.Audio.Length == 1)
+						//	first = mediaInfo.Audio.First();
+						//int channels = first == null ? 7 : first.Channels;
+						//if (channels >= 7)
+						//	audioKbps = 360; // A range of 320-383 was tested to produce the same output at 7ch.
+						//else if (channels == 6)
+						//	audioKbps = 250; // This was tested to sound fine.
+						//else if (channels == 5)
+						//	audioKbps = 224; // Wild guess
+						//else if (channels == 4)
+						//	audioKbps = 192; // Wild guess
+						//else
+						//	audioKbps = 128;
+						//if (engAudio.Length > 0)
+						//{
+						//	// We didn't choose a specific track.
+						//	audioArgs = "--audio-lang-list eng,und"
+						//	   + " --first-audio";
+						//}
+						//else
+						//{
+						//	// There's no english.  Just copy the first audio stream.
+						//	audioArgs = "--first-audio";
+						//	// Experimentation shows that "--native-dub" will prevent foreign audio from being included.
+						//	dubArgs = "";
+						//}
+						//audioArgs = " --aencoder opus"
+						//		 + " --mixdown 5_2_lfe"
+						//		 + " --ab " + audioKbps;
 					}
 				}
+
+				// SUBTITLES
+				if (encoderConfig.AllTextTracks)
+				{
+					// There has been too much uncertainty with audio/subtitle tracks not being included because they were marked wrong in the metadata (wrong language, no language, unmarked commentary track, etc.).
+					// Beginning around April 2023, we now grab all audio and sub tracks.
+					subtitleArgs = "--all-subtitles";
+				}
 				else
 				{
-					TextTrack forced = engSubs.FirstOrDefault(t => IsYes(t.Forced));
-					TextTrack defaultSub = engSubs.FirstOrDefault(t => IsYes(t.Default));
-					// If there is no default subtitle track, we'll make the default be the first forced subs track.
-					// (forced subs are those normally shown even when captions are not enabled)
-					if (defaultSub == null)
+					TextTrack[] engSubs = mediaInfo.Text.Where(t => "en".IEquals(t.Language)).ToArray();
+					if (engSubs.Length == 0)
 					{
-						for (int i = 0; i < engSubs.Length; i++)
+						subtitleArgs = "--all-subtitles";
+						// Additional conditions removed March 2023; if no English, take all subs in case languages were mislabeled.
+						//if (mediaInfo.Text.All(tt => string.IsNullOrWhiteSpace(tt.Language)) // All text tracks are missing language data.
+						//	|| mediaInfo.Text.Any(tt => "PGS".Equals(tt.Format, StringComparison.OrdinalIgnoreCase))) // At least one text track is PGS format (bitmap subtitles) which we can't detect language on if it wasn't tagged properly.
+						//{ }
+					}
+					else
+					{
+						subtitleArgs = "--subtitle-lang-list eng --all-subtitles";
+						//+ " --native-language eng";
+						TextTrack defaultSub = engSubs.FirstOrDefault(t => IsYes(t.Default));
+						// If there is no default subtitle track, we'll make the default be the first forced subs track.
+						// (forced subs are those normally shown even when captions are not enabled)
+						if (defaultSub == null)
 						{
-							if (IsYes(engSubs[i].Forced))
+							for (int i = 0; i < engSubs.Length; i++)
 							{
-								subtitleArgs = "-s " + string.Join(",", engSubs.Select(t => t.GetOrderArgument()))
-											+ " --subtitle-default=" + (i + 1);
-								dubArgs = "";
-								break;
+								if (IsYes(engSubs[i].Forced))
+								{
+									// Include english subs via explicit list, and specify which one is default.
+									subtitleArgs = "-s " + string.Join(",", engSubs.Select(t => t.HandbrakeStreamNumber))
+												+ " --subtitle-default=" + (i + 1);
+									break;
+								}
 							}
 						}
 					}
 				}
-			}
-			if (chooseAudioTrack != null)
-			{
-				audioArgs = "--audio " + chooseAudioTrack;
-				if (!reencodeAudio)
-				{
-					audioArgs += " --aencoder copy";
-				}
-			}
-			else if (hasEngAudio)
-			{
-				// We didn't choose a specific track.
-				audioArgs = "--audio-lang-list eng,und"
-				   + " --first-audio";
-			}
-			else
-			{
-				// There's no english.  Just copy the first audio stream.
-				audioArgs = "--first-audio";
-				// Experimentation shows that "--native-dub" will prevent foreign audio from being included.
-				dubArgs = "";
-			}
-			if (reencodeAudio)
-			{
-				audioArgs += " --aencoder ca_aac"
-						+ " --mixdown 5_2_lfe"
-						+ " --ab " + audioKbps;
-				//+ " --audio-fallback av_aac"
-			}
-			else
-			{
-				audioArgs += " --aencoder copy";
 			}
 
 			string cropArg = "";
@@ -245,6 +250,39 @@ namespace VideoEncodingAutomation
 					 + " -q " + encoderConfig.Quality
 					 + cropArg
 					 + " --modulus 2";
+		}
+
+		private string GetAudioArgs(AudioTrack[] tracks)
+		{
+			List<int> trackNumbers = new List<int>();
+			List<string> aencoders = new List<string>();
+			List<int> abitrates = new List<int>();
+			foreach (AudioTrack track in tracks)
+			{
+				trackNumbers.Add(track.HandbrakeStreamNumber);
+
+				string f = track.Format;
+				bool isBasicCodec = f == null ? false : (f.IEquals("AAC") || f.IEquals("AAC LC") || f.IEquals("A_AAC-2") || f.IEquals("AC-3") || f.IEquals("E-AC-3") || f.IContains("opus"));
+				if (isBasicCodec && int.TryParse(track.BitRate, out int bitRate) && bitRate <= 420000)
+					aencoders.Add("copy");
+				else
+					aencoders.Add("opus");
+
+				if (track.Channels >= 7)
+					abitrates.Add(360);
+				else if (track.Channels >= 5)
+					abitrates.Add(256);
+				else if (track.Channels == 5)
+					abitrates.Add(224);
+				else if (track.Channels == 4)
+					abitrates.Add(192);
+				else
+					abitrates.Add(128);
+			}
+			return "--audio " + string.Join(",", trackNumbers)
+				+ " --aencoder " + string.Join(",", aencoders)
+				+ " --ab " + string.Join(",", abitrates)
+				+ " --audio-fallback opus";
 		}
 
 		/// <summary>
@@ -278,7 +316,6 @@ namespace VideoEncodingAutomation
 				+ " " + videoArgs
 				+ " " + audioArgs
 				+ " " + subtitleArgs
-				+ dubArgs
 				+ (outputFilePath.EndsWith(".mp4", StringComparison.OrdinalIgnoreCase) ? " -O" : "")
 				+ (!string.IsNullOrWhiteSpace(rangeArgs) ? " " + rangeArgs : "");
 		}
