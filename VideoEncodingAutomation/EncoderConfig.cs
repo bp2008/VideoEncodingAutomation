@@ -30,13 +30,13 @@ namespace VideoEncodingAutomation
 		/// </summary>
 		public string HandbrakeCrop = "0:0:0:0";
 		/// <summary>
-		/// If true, all audio tracks are captured. If false, an algorithm tries to find the best English language track. Regardless, an algorithm decides whether or not to recompress.
+		/// Flags which forcibly widen the scope of audio track selection.
 		/// </summary>
-		public bool AllAudioTracks = false;
+		public AudioTrackSelectionConfig AudioTrackSelection = new AudioTrackSelectionConfig();
 		/// <summary>
-		/// If true, all text tracks are captured. If false, only English tracks are captured.
+		/// Flags which affect subtitle track selection.
 		/// </summary>
-		public bool AllTextTracks = false;
+		public SubtitleTrackSelectionConfig SubtitleTrackSelection = new SubtitleTrackSelectionConfig();
 
 		public bool LimitedRange = false;
 		public int StartTimeSeconds = 0;
@@ -93,5 +93,33 @@ namespace VideoEncodingAutomation
 			else
 				return "Encoder must be handbrake";
 		}
+	}
+
+	public class AudioTrackSelectionConfig
+	{
+		/// <summary>
+		/// Forces all audio tracks to be chosen.
+		/// </summary>
+		public bool AllTracks = false;
+		/// <summary>
+		/// Forces all audio tracks to be chosen except those which likely contain creator commentary.
+		/// </summary>
+		public bool AllTracksNoCommentary = false;
+		/// <summary>
+		/// Forces all English audio tracks to be chosen.
+		/// </summary>
+		public bool AllEnglish = false;
+		/// <summary>
+		/// Forces all English audio tracks to be chosen except those which likely contain creator commentary.
+		/// </summary>
+		public bool AllEnglishNoCommentary = false;
+	}
+
+	public class SubtitleTrackSelectionConfig
+	{
+		/// <summary>
+		/// Forces all subtitle tracks to be chosen. If false, default behavior will apply (all English subtitle tracks chosen).
+		/// </summary>
+		public bool AllTracks = false;
 	}
 }
