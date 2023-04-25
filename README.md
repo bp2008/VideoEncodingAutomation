@@ -53,7 +53,7 @@ As an example, here is the `encoder.txt` from `q23-SmartCrop`.
 * `"Encoder": "handbrake"` instructs the app to use handbrake (currently this is the only allowed value of the field)
 * `VideoEncoder` can be `"x265"` or `"x264"` or `"av1"`
 * `VideoEncoderPreset` can be any of the encoder presets defined by the codec. See HandBrakeCLI documentation.
-* "Quality" is the constant rate factor number defined by the codec. See HandBrakeCLI documentation.  For `x264` and `x265`, the range is `0-51` (lower is better quality), and a commonly used range is `18-23`.  For `av1`, the range is `0-63` (lower is better quality) and a commonly used range is `24-28`.
+* `Quality` is the constant rate factor number defined by the codec. See HandBrakeCLI documentation.  For `x264` and `x265`, the range is `0-51` (lower is better quality), and a commonly used range is `18-23`.  For `av1`, the range is `0-63` (lower is better quality) and a commonly used range is `24-28`.
 * `HandbrakeCrop` defines a value for HandbrakeCLI's `--crop` argument.  It could be `"0:0:0:0"` to do no cropping, `"280:280:0:0"` to remove 280 rows from the top and bottom, `""` to let handbrake crop automatically, or `"Smart"` to use my own custom cropping calculations which are especially conservative (high priority on preserving all image data, even at the cost of some black rows remaining).
 * `KeepInputForDebuggingAfterward` is for debugging or testing purposes.  If it is false, the input videos are DELETED after transcoding has completed.  When using `"KeepInputForDebuggingAfterward": true`, it is advised to also set `LimitedRange` to true in order to use the `"StartTimeSeconds"` and `"DurationSeconds"` arguments in order to transcode small samples of video in relatively little time.
 
