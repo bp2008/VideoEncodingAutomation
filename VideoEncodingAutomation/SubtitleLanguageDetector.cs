@@ -35,7 +35,6 @@ namespace VideoEncodingAutomation
 				string args = sb.ToString();
 				ProcessRunner.RunProcessAndWait("ffmpeg/ffmpeg.exe", args, out string std, out string err);
 
-				Process.Start(tempDir.FullName);
 				Dictionary<int, string> results = new Dictionary<int, string>();
 				foreach (int tn in subtitleTrackNumbers)
 				{
@@ -54,7 +53,7 @@ namespace VideoEncodingAutomation
 			// Don't forget to deploy a language profile (e.g. Core14.profile.xml) with your application.
 			// (take a look at "content" folder inside of NTextCat nupkg and here: https://github.com/ivanakcheurov/ntextcat/tree/master/src/LanguageModels).
 			RankedLanguageIdentifierFactory factory = new RankedLanguageIdentifierFactory();
-			RankedLanguageIdentifier identifier = factory.Load("Core14.profile.xml"); // can be an absolute or relative path. Beware of 260 chars limitation of the path length in Windows. Linux allows 4096 chars.
+			RankedLanguageIdentifier identifier = factory.Load("NTextCat/Core14.profile.xml"); // can be an absolute or relative path. Beware of 260 chars limitation of the path length in Windows. Linux allows 4096 chars.
 			var languages = identifier.Identify(text);
 			var mostCertainLanguage = languages.FirstOrDefault();
 			if (mostCertainLanguage != null)
