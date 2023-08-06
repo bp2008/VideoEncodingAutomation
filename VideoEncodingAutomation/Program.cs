@@ -40,8 +40,8 @@ namespace VideoEncodingAutomation
 				settings.Save(Globals.WritableDirectoryBase + "Settings.cfg");
 
 			File.WriteAllText(Globals.WritableDirectoryBase + "encoder-default.txt", JsonConvert.SerializeObject(new EncoderConfig(), Formatting.Indented), Encoding.UTF8);
-			WebServer ws = new WebServer(settings.webPort);
-			ws.Start();
+			WebServer ws = new WebServer();
+			ws.SetBindings(settings.webPort);
 
 			Console.WriteLine("Web server listening on port " + settings.webPort + ".  Type \"exit\" to shut down.");
 			while (Console.ReadLine().ToLower() != "exit")

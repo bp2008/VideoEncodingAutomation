@@ -230,7 +230,7 @@ namespace VideoEncodingAutomation
 			{
 				FileInfo[] files = diInput.GetFiles("*", SearchOption.AllDirectories)
 					.Where(fi => allowedExtensionsLower.Contains(fi.Extension.ToLower()))
-					.OrderBy(fi => fi.LastWriteTimeUtc)
+					.OrderBy(fi => fi.GetLastWriteTimeUtcAndRepairIfBroken())
 					.ToArray();
 				foreach (FileInfo fi in files)
 				{

@@ -16,7 +16,7 @@ namespace VideoEncodingAutomation
 		StreamingLogReader slogReader = new StreamingLogReader(null, 200);
 		SlowStatus _slowStatus = new SlowStatus();
 
-		public WebServer(int port, int httpsPort = -1, X509Certificate2 cert = null) : base(port, httpsPort, cert)
+		public WebServer(X509Certificate2 cert = null) : base(SimpleCertificateSelector.FromCertificate(cert))
 		{
 			ha.Start();
 			slogReader.Start();
