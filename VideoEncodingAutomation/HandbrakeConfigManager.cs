@@ -98,7 +98,7 @@ namespace VideoEncodingAutomation
 				if (chosenAudioTrackNumbers.Count == 0 || encoderConfig.AudioTrackSelection.AllTracksNoCommentary)
 					chosenAudioTrackNumbers.AddRange(mediaInfo.Audio.Where(a => !IsAudioCommentary(a)).Select(a => a.HandbrakeStreamNumber));
 
-				if (chosenAudioTrackNumbers.Count == 0 || encoderConfig.AudioTrackSelection.AllTracksNoCommentary)
+				if (chosenAudioTrackNumbers.Count == 0 || encoderConfig.AudioTrackSelection.AllTracks)
 					chosenAudioTrackNumbers.AddRange(mediaInfo.Audio.Select(a => a.HandbrakeStreamNumber));
 
 				audioArgs = GetAudioArgs(mediaInfo.Audio.Where(a => chosenAudioTrackNumbers.Contains(a.HandbrakeStreamNumber)).OrderByDescending(a => a.HandbrakeStreamNumber).ToArray());

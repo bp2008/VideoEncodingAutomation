@@ -108,7 +108,7 @@ namespace VideoEncodingAutomation
 			}
 		}
 
-		public override void handlePOSTRequest(HttpProcessor p, StreamReader inputData)
+		public override void handlePOSTRequest(HttpProcessor p)
 		{
 		}
 
