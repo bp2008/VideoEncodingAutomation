@@ -265,7 +265,7 @@ namespace VideoEncodingAutomation.Cropping
 			int end = start + (width * 3);
 			for (int bo = start; bo < end; bo += 3)
 			{
-				set.AddPixel(GetBrightnessOfPixelBGR(rawData, bo));
+				set.AddPixel(rawData, bo);
 			}
 			return set.JudgeIsMeaningful();
 		}
@@ -284,7 +284,7 @@ namespace VideoEncodingAutomation.Cropping
 			for (int y = 0; y < height; y++)
 			{
 				int bo = (y * stride) + (x * 3);
-				set.AddPixel(GetBrightnessOfPixelBGR(rawData, bo));
+				set.AddPixel(rawData, bo);
 			}
 			return set.JudgeIsMeaningful();
 		}
@@ -345,47 +345,70 @@ namespace VideoEncodingAutomation.Cropping
 		}
 		class PixelSet
 		{
-			public int darkA; // Effectively black
-			public int darkB; // Borderline visible
-			public int darkC; // Visible, but probably not important
+			public double totalPixels;
+			public int effectivelyBlack; // Effectively black
+			public int below17; // very dark
+			public int below33; // Visible, but probably not important
 			public int light; // Valuable
-			public void AddPixel(float brightness)
+			/// <summary>
+			/// After adding all pixels, this flag will be true if all the pixels were very close to the first pixel in all color channels.
+			/// </summary>
+			public bool allPixelsSame = true;
+			public float firstPixelBrightness = -1f;
+			public byte firstPixelR;
+			public byte firstPixelG;
+			public byte firstPixelB;
+			public void AddPixel(byte[] buf, int idxStart)
 			{
-				if (brightness < 0.01f)
-					darkA++;
-				else if (brightness < 0.025f)
-					darkB++;
-				else if (brightness < 0.05f)
-					darkC++;
+				totalPixels++;
+				byte B = buf[idxStart];
+				byte G = buf[idxStart + 1];
+				byte R = buf[idxStart + 2];
+				float brightness = (B * 0.114f)
+								+ (G / 255f) * 0.587f
+								+ (R / 255f) * 0.229f;
+				if (firstPixelBrightness == -1)
+				{
+					firstPixelBrightness = brightness;
+					firstPixelB = B;
+					firstPixelG = G;
+					firstPixelR = R;
+				}
+				else if (Math.Abs(firstPixelB - B) > 2 || Math.Abs(firstPixelG - G) > 2 || Math.Abs(firstPixelR - R) > 2)
+				{
+					allPixelsSame = false;
+				}
+
+				if (brightness < 0.02f)
+					effectivelyBlack++;
+				else if (B < 17 && G < 17 && R < 17)
+					below17++;
+				else if (B < 33 && G < 33 && R < 33)
+					below33++;
 				else
 					light++;
 			}
 			public bool JudgeIsMeaningful()
 			{
-				double totalSubpixels = darkA + darkB + darkC + light;
+				if (allPixelsSame && firstPixelBrightness <= 0.07f)
+					return false; // If all pixels were the same brightness, 
+								  //if (light / totalPixels > 0)
+								  //	CropCalculator.qlight.Enqueue(light / totalPixels);
+								  //if (darkC / totalPixels > 0)
+								  //	CropCalculator.qdarkC.Enqueue(darkC / totalPixels);
+								  //if (darkB / totalPixels > 0)
+								  //	CropCalculator.qdarkB.Enqueue(darkB / totalPixels);
+								  //if (darkA / totalPixels < 1)
+								  //	CropCalculator.qdarkA.Enqueue(darkA / totalPixels);
 
-				//if (light / totalSubpixels > 0)
-				//	CropCalculator.qlight.Enqueue(light / totalSubpixels);
-				//if (darkC / totalSubpixels > 0)
-				//	CropCalculator.qdarkC.Enqueue(darkC / totalSubpixels);
-				//if (darkB / totalSubpixels > 0)
-				//	CropCalculator.qdarkB.Enqueue(darkB / totalSubpixels);
-				//if (darkA / totalSubpixels < 1)
-				//	CropCalculator.qdarkA.Enqueue(darkA / totalSubpixels);
-
-				if (light / totalSubpixels > 0.001) // Minimum 0.1% light
+				if (light / totalPixels > 0.001) // More than 0.1% light = meaningful
 				{
 					//Console.WriteLine("light ratio " + (light / totalSubpixels));
 					return true;
 				}
-				if (darkC / totalSubpixels > 0.02) // Minimum 2% dark level C
+				if (below33 / totalPixels > 0.2) // More than 20% [visible, but probably not important] = meaningful
 				{
 					//Console.WriteLine("darkC ratio " + (light / totalSubpixels));
-					return true;
-				}
-				if (darkB / totalSubpixels > 0.9) // Minimum 90% dark level B
-				{
-					//Console.WriteLine("darkB ratio " + (light / totalSubpixels));
 					return true;
 				}
 				return false;

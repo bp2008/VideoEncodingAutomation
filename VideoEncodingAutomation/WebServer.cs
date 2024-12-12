@@ -24,87 +24,68 @@ namespace VideoEncodingAutomation
 
 		public override void handleGETRequest(HttpProcessor p)
 		{
-			if (p.requestedPage == "")
+			if (p.Request.Page == "")
 			{
 				FileInfo fi = new FileInfo(Program.isDebug ? "../../default.html" : (Globals.ApplicationDirectoryBase + "default.html"));
-				if (fi.Exists)
-				{
-					p.writeSuccess(contentLength: fi.Length);
-					p.outputStream.Flush();
-					using (Stream fiStr = fi.OpenRead())
-						fiStr.CopyTo(p.tcpStream);
-					p.tcpStream.Flush();
-				}
+				p.Response.StaticFile(fi);
 				return;
 			}
-			else if (p.requestedPage == "jquery-3.1.1.min.js")
+			else if (p.Request.Page == "jquery-3.1.1.min.js")
 			{
 				FileInfo fi = new FileInfo(Program.isDebug ? "../../jquery-3.1.1.min.js" : (Globals.ApplicationDirectoryBase + "jquery-3.1.1.min.js"));
-				if (fi.Exists)
-				{
-					p.writeSuccess("text/javascript; charset=UTF-8", contentLength: fi.Length);
-					p.outputStream.Flush();
-					using (Stream fiStr = fi.OpenRead())
-						fiStr.CopyTo(p.tcpStream);
-					p.tcpStream.Flush();
-				}
+				p.Response.StaticFile(fi);
 				return;
 			}
 
-			if (p.requestedPage == "log")
+			if (p.Request.Page == "log")
 			{
-				int lastLineLoaded = p.GetIntParam("l", -1);
-				long readerId = p.GetLongParam("i");
+				int lastLineLoaded = p.Request.GetIntParam("l", -1);
+				long readerId = p.Request.GetLongParam("i");
 				List<string> logUpdate = slogReader.GetLogUpdate(readerId, ref lastLineLoaded);
 				string json = JsonConvert.SerializeObject(new LogUpdateResponse(logUpdate, lastLineLoaded));
-				p.writeSuccess("application/json; charset=UTF-8");
-				p.outputStream.Write(json);
+				p.Response.FullResponseUTF8(json, "application/json; charset=UTF-8");
 			}
-			else if (p.requestedPage == "logReaderId")
+			else if (p.Request.Page == "logReaderId")
 			{
-				p.writeSuccess("text/plain; charset=UTF-8");
-				p.outputStream.Write(slogReader.readerId.ToString());
+				p.Response.FullResponseUTF8(slogReader.readerId.ToString(), "text/plain; charset=UTF-8");
 			}
-			else if (p.requestedPage == "status")
+			else if (p.Request.Page == "status")
 			{
 				string json = JsonConvert.SerializeObject(ha.status);
-				p.writeSuccess("application/json; charset=UTF-8");
-				p.outputStream.Write(json);
+				p.Response.FullResponseUTF8(json, "application/json; charset=UTF-8");
 			}
-			else if (p.requestedPage == "slowstatus")
+			else if (p.Request.Page == "slowstatus")
 			{
 				SlowStatus status = UpdateSlowStatus();
 				string json = JsonConvert.SerializeObject(status);
-				p.writeSuccess("application/json; charset=UTF-8");
-				p.outputStream.Write(json);
+				p.Response.FullResponseUTF8(json, "application/json; charset=UTF-8");
 			}
-			else if (p.requestedPage == "restart_handbrake_agent")
+			else if (p.Request.Page == "restart_handbrake_agent")
 			{
-				p.writeSuccess("text/plain; charset=UTF-8");
 				if (ha.Active)
-					p.outputStream.Write("0");
+					p.Response.FullResponseUTF8("0", "text/plain; charset=UTF-8");
 				else
 				{
 					ha.Shutdown();
 					ha = new HandbrakeAgent();
 					ha.Start();
-					p.outputStream.Write("1");
+					p.Response.FullResponseUTF8("0", "text/plain; charset=UTF-8");
 				}
 			}
-			else if (p.requestedPage == "abort_handbrake_processing")
+			else if (p.Request.Page == "abort_handbrake_processing")
 			{
 				ha.AbortCurrentProcessing();
-				p.writeSuccess();
+				p.Response.FullResponseUTF8("", "text/plain; charset=UTF-8");
 			}
-			else if (p.requestedPage == "pause_handbrake_processing")
+			else if (p.Request.Page == "pause_handbrake_processing")
 			{
 				ha.Pause();
-				p.writeSuccess();
+				p.Response.FullResponseUTF8("", "text/plain; charset=UTF-8");
 			}
-			else if (p.requestedPage == "unpause_handbrake_processing")
+			else if (p.Request.Page == "unpause_handbrake_processing")
 			{
 				ha.Unpause();
-				p.writeSuccess();
+				p.Response.FullResponseUTF8("", "text/plain; charset=UTF-8");
 			}
 		}
 

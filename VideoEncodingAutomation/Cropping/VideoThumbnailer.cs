@@ -89,7 +89,15 @@ namespace VideoEncodingAutomation.Cropping
 					if (exitCode != 0)
 						throw new Exception("ffprobe exited with code " + exitCode);
 
-					Ffprobe mediaInfo = Ffprobe.FromJson(sbOut.ToString());
+					Ffprobe mediaInfo = null;
+					try
+					{
+						mediaInfo = Ffprobe.FromJson(sbOut.ToString());
+					}
+					catch (Exception ex)
+					{
+						throw new ApplicationException("ffprobe output could not be decoded: " + sbOut.ToString(), ex);
+					}
 					if (double.TryParse(mediaInfo.Format.Duration, out double durationSeconds))
 						sourceVideoDurationSeconds = durationSeconds;
 					else
